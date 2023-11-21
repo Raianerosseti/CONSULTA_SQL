@@ -1,0 +1,272 @@
+library(stringr)
+library(tidyverse)
+
+
+dimensoesDados = read_excel("Dimensoes_DadosModelagem.xlsx")
+fatoCabecalho = read.csv("FatoCabecalho_DadosModelagem.txt", header = T, sep = "\t", dec = ",")
+fatoDetalhes = read.csv("FatoDetalhes_DadosModelagem.csv", header = TRUE,sep = ";", dec = ",")
+
+
+
+# unindo as tabelas fatoCabecalho e fatoDetalhes
+df2 = inner_join(fatoCabecalho, fatoDetalhes, by = "CupomID")
+
+# Valor total das vendas e dos fretes por produto e ordem de venda:
+
+
+df2 |>
+  group_by(ProdutoID, CupomID)|>
+  summarise(
+    vendaTotal = sum(Valor),
+    freteTotal = sum(ValorFrete)
+  )|>
+  arrange(desc(vendaTotal))|>
+  mutate(
+    vendaTotal = sprintf("%.2f", vendaTotal),
+    freteTotal = sprintf("%.2f", freteTotal)
+  )
+
+##########################################################################
+# Esse comando nos trouxe como resultado os tipos de produtos por pedido que mais faturaram e o valor do frete. Dentre eles estão os produtos cujos ID's estão listados abaixo:
+
+#   ProdutoID CupomID vendaTotal freteTotal
+#       <int>   <int> <chr>      <chr>     
+#1        76   10991 43755.12   63.32     
+#2        76   10612 32075.20   66.44     
+#3        76   10961 23334.60   74.31     
+#4        76   11050 21109.55   74.80     
+#5        76   10808 21077.20   25.87
+
+############################################################
+
+##########################################################################
+# Valor de venda total por tipo de produto :
+df2 |>
+  group_by(ProdutoID)|>
+  summarise(
+    quantidadeVendas = n_distinct(CupomID),
+    vendaTotal = sum(Valor),
+    lucro = sum(ValorLiquido)
+  )|>
+  arrange(desc(vendaTotal))|>
+  mutate(
+    vendaTotal = sprintf("%.2f", vendaTotal),
+    lucro = sprintf("%.2f", lucro)
+  )
+
+##########################################################################
+# Esse comando nos trouxe como resultado os tipos de produtos que mais faturaram, além da quantidade de vendas em que eles estavam inclusos e o lucro. Dentre eles estão os produtos cujos ID's estão listados abaixo:
+
+#  ProdutoID quantidadeVendas vendaTotal lucro   
+#<int>            <int> <chr>      <chr>   
+#  1        76               39 408674.51  81839.94
+# 2        29               32 102710.00  21737.68
+# 3        51               40 93455.53   19898.06
+# 4        38               24 53808.22   10594.33
+# 5        56               50 52066.37   10894.02
+
+##########################################################################
+  
+#Quantidade e valor das vendas por dia, mês, ano
+  
+str(df2)
+df2$Data = as.Date(df2$Data, format = "%d/%m/%Y")
+
+# por dia
+df2 |>
+  group_by(Data) |>
+  summarise(
+    quantidadeVendas = n(),
+    valorDia = sum(Valor)
+  ) |>
+  arrange(desc(valorDia)) |>
+  mutate(
+    valorDia = sprintf("%.2f", valorDia)
+  )
+
+
+##########################################################################
+# Esse comando nos trouxe como resultado o valor faturado e a quantidade de vendas por dia. Os dias que a empresa mais faturou foram:
+
+# Data       quantidadeVendas valorDia
+# <date>                <int> <chr>   
+# 1 2017-07-07             9 60133.43
+# 2 2016-07-02             5 33479.95
+# 3 2016-03-20             6 29134.86
+# 4 2017-06-24             5 24532.43
+# 5 2018-01-30             4 23973.49   
+
+
+############################################################
+
+# por mês // Lucro dos meses:
+df2$Mes = unlist(str_extract_all(df2$Data, pattern = "\\d{4}-\\d{2}"))
+
+df2 |>
+  group_by(Mes)|>
+  summarise(
+    quantidadeVendas = n(),
+    valorMensal = sum(Valor),
+    lucro = sum(ValorLiquido)
+  ) |>
+  arrange(desc(valorMensal))|>
+  mutate(
+    valorMensal = sprintf("%.2f", valorMensal),
+    lucro = sprintf("%.2f", lucro)
+  )
+##########################################################################
+# Esse comando nos trouxe como resultado a quantidade de vendas, o valor faturado e o lucro por mês. Os meses que a empresa mais faturou foram:
+
+#  Mes     quantidadeVendas valorMensal lucro   
+#  <chr>              <int> <chr>       <chr>   
+# 1 2017-07              152 161486.82   33079.68
+# 2 2017-01               96 100480.33   23183.08
+# 3 2017-03              102 84215.72    19378.88
+# 4 2016-03               45 82940.96    18136.15
+# 5 2016-07               54 78455.82    16128.97  
+
+
+##########################################################################
+
+# por ano:
+df2$ano = unlist(str_extract_all(df2$Data, pattern = "^\\d{4}"))
+df2 |>
+  group_by(ano) |>
+  summarise(
+    quantidadeVendas = n(),
+    valorAnual = sum(Valor)
+  ) |>
+  arrange(desc(valorAnual))|>
+  mutate(
+    valorAnual = sprintf("%.2f", valorAnual)
+  )
+
+##########################################################################
+# Esse comando nos trouxe como resultado a quantidade de vendas, o valor faturado anual. Os registros obtidos foram:
+
+#  ano   quantidadeVendas valorAnual
+# <chr>            <int> <chr>     
+#1 2017              1041 853463.10 
+#2 2016               587 507767.73 
+#3 2015               346 248594.09 
+#4 2018               162 157429.65 
+#5 2014                36 15893.62  
+
+
+##########################################################################
+  
+  ### juntando as 3 tabelas:
+df3 = inner_join(df2, dimensoesDados, by = "ClienteID")
+View(df3)  
+  
+###  Venda por cliente, cidade do cliente e estado;
+
+# por cliente: 
+
+df3 |>
+  group_by(ClienteID)|>
+  summarise(
+    quantidadeVendas = n_distinct(CupomID),
+    valorTotal = sum(Valor),
+    mediaValor = mean(Valor)
+  )|>
+  arrange(desc(valorTotal))|>
+  mutate(
+    valorTotal = sprintf("%.2f", valorTotal),
+    mediaValor = sprintf("%.2f", mediaValor)
+  )
+
+##########################################################################
+# Esse comando nos trouxe como resultado a quantidade de vendas, o valor faturado com o cliente e a média dos valores gastos por cada um deles. Os clientes com maiores gastos foram:
+
+#ClienteID quantidadeVendas valorTotal mediaValor
+#<dbl>            <int> <chr>      <chr>     
+#1        63               36 201320.49  1899.25   
+#2        19               43 152114.80  1216.92   
+#3        37               48 131133.21  936.67    
+#4        23               26 91362.15   1268.92   
+#5        32               42 82519.86   676.39 
+
+##########################################################################
+
+
+# por cidade:
+df3 |>
+  group_by(Cidade)|>
+  summarise(
+    quantidadeVendas = n_distinct(CupomID),
+    valorTotal = sum(Valor),
+    mediaValor = mean(Valor)
+  )|>
+  arrange(desc(valorTotal))|>
+  mutate(
+    valorTotal = sprintf("%.2f", valorTotal),
+    mediaValor = sprintf("%.2f", mediaValor)
+  )
+##########################################################################
+# Já as cidades que geraram maior faturamento para a empresa, e suas respectivas médias de gastos e quantidade de compras, foram:
+
+#Cidade      quantidadeVendas valorTotal mediaValor
+#<chr>                  <int> <chr>      <chr>     
+#1 Dresden                   36 201320.49  1899.25   
+#2 London                    57 164197.02  1080.24   
+#3 Cork                      48 131133.21  936.67    
+#4 Lille                     26 91362.15   1268.92   
+#5 Mexico City               41 87158.31   771.31    
+
+##########################################################################
+
+# por região:
+df3 |>
+  group_by(Regiao)|>
+  summarise(
+    quantidadeVendas = n_distinct(CupomID),
+    valorTotal = sum(Valor),
+    mediaValor = mean(Valor)
+  )|>
+  arrange(desc(valorTotal))|>
+  mutate(
+    valorTotal = sprintf("%.2f", valorTotal),
+    mediaValor = sprintf("%.2f", mediaValor)
+  )
+
+##########################################################################
+# Enquanto as regiões que geraram maior faturamento para a empresa, e suas respectivas médias de gastos e quantidade de compras, foram:
+
+#Regiao        quantidadeVendas valorTotal mediaValor
+#<chr>                    <int> <chr>      <chr>     
+#1 Europe                     541 1257293.32 898.07    
+#2 North America              171 326840.27  699.87    
+#3 South America              124 199014.60  652.51    
+
+##########################################################################
+
+#média de produto:
+
+df3 |>
+  summarise(
+    qntProd = sum(Quantidade),
+    qntVendas = n_distinct(CupomID),
+    media = qntProd/qntVendas
+  )
+##########################################################################
+# Já a média de produtos por compra foi de 62.27, como pode ser visto abaixo: 
+#   qntProd     qntVendas    media
+#1   52057       836         62.26914
+
+##########################################################################
+
+# Média de compras que um cliente faz:
+
+df3 |>
+  summarise(
+    qntCompras = n_distinct(CupomID),
+    qntClientes = n_distinct(ClienteID),
+    media = qntCompras/qntClientes
+  )
+##########################################################################
+# Por outro lado, a média de compras por cliente foi de 9.29, conforme abaixo:
+#     qntCompras   qntClientes    media
+#1        836             90     9.288889
+
+##########################################################################
